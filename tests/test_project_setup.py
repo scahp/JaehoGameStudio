@@ -79,7 +79,7 @@ class ProjectSetupTests(unittest.TestCase):
         base = self.project / ".jaeho-studio"
         created = list(base.rglob("*.md"))
         self.assertEqual(len(created), 9)
-        self.assertIn(str(self.project), (base / "project.md").read_bytes().decode("utf-8"))
+        self.assertIn(str(self.project.resolve()), (base / "project.md").read_bytes().decode("utf-8"))
         for path in created:
             self.assertNotIn(b"\r", path.read_bytes())
             path.read_bytes().decode("utf-8")
