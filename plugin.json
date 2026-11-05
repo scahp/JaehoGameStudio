@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "jaeho-game-studio",
+  "version": "1.1.0",
+  "description": "JaehoGameStudio: 개인 게임 엔진 개발을 위한 역할별 에이전트 7명과 프로젝트 컨텍스트 유지 워크플로",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "JaehoGameStudio",
+        "shortDescription": "개인 게임 엔진 개발 에이전트 팀",
+        "developerName": "Jaeho",
+        "category": "Developer Tools"
+      }
+    }
+  },
+  "repository": "https://github.com/scahp/JaehoGameStudio",
+  "homepage": "https://github.com/scahp/JaehoGameStudio",
+  "license": "MIT"
+}

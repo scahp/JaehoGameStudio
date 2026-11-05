@@ -1,0 +1,22 @@
+# Local runtime state and credentials
+.jaeho-studio/
+.codex/
+.openclaw/
+sessions.json
+backups/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+
+# Caches and generated output
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+build/
+dist/

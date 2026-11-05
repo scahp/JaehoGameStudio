@@ -1,0 +1,20 @@
+[
+  {
+    "path": "agents.entries[\"main\"].subagents.allowAgents",
+    "value": [
+      "jgs-director"
+    ]
+  },
+  {
+    "path": "agents.entries[\"jgs-director\"].subagents.allowAgents",
+    "value": [
+      "jgs-director",
+      "jgs-graphics",
+      "jgs-editor",
+      "jgs-core",
+      "jgs-network",
+      "jgs-devrel",
+      "jgs-particles"
+    ]
+  }
+]
