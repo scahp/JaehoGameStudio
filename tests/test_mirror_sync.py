@@ -128,6 +128,24 @@ class MirrorSyncTests(unittest.TestCase):
     def initialize(self, project=True):
         self.assert_ok(self.run_sync(project=project))
 
+    def run_git(self, *arguments):
+        # Ignore inherited Git redirection and configuration, and never write
+        # identity settings into a real user's global configuration.
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        environment.update({
+            "HOME": str(self.home), "USERPROFILE": str(self.home),
+            "XDG_CONFIG_HOME": str(self.home / "config"),
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0",
+        })
+        command = ["git", "-c", "user.name=StudioTest", "-c", "user.email=test@invalid",
+                   "-c", "commit.gpgsign=false", "-c", "core.autocrlf=true",
+                   "-c", "core.safecrlf=false", *arguments]
+        result = subprocess.run(command, cwd=self.project, env=environment,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+        self.assert_ok(result)
+        return result
+
     def assert_rejected_without_changes(self, project=True, check=False):
         before = snapshot(self.root)
         result = self.run_sync(project=project, check=check)
@@ -290,6 +308,65 @@ class MirrorSyncTests(unittest.TestCase):
         self.assertEqual(snapshot(self.root), before)
         self.assert_ok(self.run_sync(check=True))
         self.assertEqual(snapshot(self.root), before)
+
+    def test_existing_gitattributes_prefix_is_preserved_and_repeat_is_unchanged(self):
+        path = self.project / ".gitattributes"
+        for ending in (b"\r\n", b""):
+            with self.subTest(ending=ending):
+                original = b"# owner \xff custom rules\r\n*.md text eol=crlf\r\n*.png -text" + ending
+                path.write_bytes(original)
+                self.initialize()
+                installed = path.read_bytes()
+                self.assertTrue(installed.startswith(original))
+                self.assertEqual(installed.count(b"# BEGIN JAEHOGAMESTUDIO MIRRORS"), 1)
+                self.assertEqual(installed.count(b"# END JAEHOGAMESTUDIO MIRRORS"), 1)
+                before = snapshot(self.root)
+                self.assert_ok(self.run_sync())
+                self.assert_ok(self.run_sync(check=True))
+                self.assertEqual(snapshot(self.root), before)
+
+    def test_crlf_git_checkout_keeps_mirror_bytes_and_check_clean(self):
+        (self.project / ".gitattributes").write_bytes(
+            b"*.md text eol=crlf\r\n*.json text eol=crlf\r\n")
+        ordinary = self.project / "ordinary.md"
+        ordinary.write_bytes(b"# Ordinary project text\n\nExisting CRLF policy applies.\n")
+        self.add_resource(self.package / "skills", relative="resources/example.json",
+                          data=b'{"resource": "LF text"}\n')
+        self.initialize()
+        managed = [self.project / ".jgs-mirror.json"]
+        for directory in (".claude/agents", ".codex/agents", ".claude/skills", ".agents/skills"):
+            managed.extend(path for path in (self.project / directory).rglob("*") if path.is_file())
+        expected = {path.relative_to(self.project): path.read_bytes() for path in managed}
+        for relative, data in expected.items():
+            self.assertNotIn(b"\r\n", data, str(relative))
+        self.run_git("init", "--quiet")
+        self.run_git("add", "--all")
+        self.run_git("commit", "--quiet", "-m", "Mirror fixture")
+        # Force materialization instead of letting Git reuse the index's
+        # up-to-date working-tree stat entries.
+        for path in managed + [ordinary]:
+            path.unlink()
+        self.run_git("checkout-index", "-a", "-f")
+        # Verify conversion really happened, while the scoped overrides kept
+        # native agents, skill resources, and state exactly as synchronized.
+        self.assertIn(b"\r\n", ordinary.read_bytes())
+        for relative, data in expected.items():
+            self.assertEqual((self.project / relative).read_bytes(), data, str(relative))
+        before = snapshot(self.root)
+        self.assert_ok(self.run_sync(check=True))
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_gitattributes_symlink_is_rejected_before_any_write(self):
+        self.link(self.project / ".gitattributes", self.outside / "keep.txt", directory=False)
+        self.assert_rejected_without_changes()
+
+    def test_different_existing_gitattributes_managed_block_rejects_all_writes(self):
+        (self.project / ".gitattributes").write_bytes(
+            b"# owner rules\r\n*.md text eol=crlf\r\n"
+            b"# BEGIN JAEHOGAMESTUDIO MIRRORS\n"
+            b"/.claude/skills/** text eol=crlf\n"
+            b"# END JAEHOGAMESTUDIO MIRRORS\n")
+        self.assert_rejected_without_changes()
 
     def test_check_before_initial_install_reports_drift_without_writing(self):
         self.assert_rejected_without_changes(check=True)

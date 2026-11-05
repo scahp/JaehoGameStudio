@@ -23,6 +23,15 @@ except ImportError:
 STATE = Path(".jgs-mirror.json")
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 IGNORED = {".git", "__pycache__", ".DS_Store"}
+ATTRIBUTES = (
+    "# BEGIN JAEHOGAMESTUDIO MIRRORS\n"
+    "/.claude/agents/jgs-*.md text eol=lf\n"
+    "/.codex/agents/jgs-*.toml text eol=lf\n"
+    "/.claude/skills/** text=auto eol=lf\n"
+    "/.agents/skills/** text=auto eol=lf\n"
+    "/.jgs-mirror.json text eol=lf\n"
+    "# END JAEHOGAMESTUDIO MIRRORS\n"
+).encode("ascii")
 
 
 class SkillFile:
@@ -360,6 +369,15 @@ def synchronize(source, project, helpers, check=False):
     if host:
         host_record = dict(state, package=Path(os.path.relpath(source, project)).as_posix())
         plan(host, STATE, encoded(host_record))
+        # Parent repositories can enforce CRLF even when the submodule uses LF.
+        # Merge only the scoped mirror rules; preserve every existing byte.
+        existing = host.read(".gitattributes") or b""
+        normalized = existing.replace(b"\r\n", b"\n")
+        if ATTRIBUTES not in normalized:
+            if b"# BEGIN JAEHOGAMESTUDIO MIRRORS" in existing or b"# END JAEHOGAMESTUDIO MIRRORS" in existing:
+                raise ValueError("existing studio .gitattributes block differs; all files preserved")
+            separator = b"\n" if existing.endswith(b"\n") else b"\n\n" if existing else b""
+            plan(host, Path(".gitattributes"), existing + separator + ATTRIBUTES)
     package.ensure_unchanged()
     if host:
         host.ensure_unchanged()

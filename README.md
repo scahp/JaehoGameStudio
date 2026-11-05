@@ -78,7 +78,7 @@ python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 - 스킬: `.claude/skills/` ↔ 공통 `skills/` ↔ `.agents/skills/`. `scripts/`, `references/`, `assets/`와 실행 비트도 포함합니다.
 - 기준 해시와 비교해 한쪽 수정을 반영하며, 서로 다른 동시 수정은 **전체 쓰기 전에 충돌**로 보고합니다. 파일 시간으로 승자를 정하지 않습니다.
 - `--check`는 파일을 변경하지 않고 동기화 누락을 검사합니다. 사라진 사본은 복구하며 삭제·이름 변경을 자동 전파하지 않습니다.
-- Windows에서도 심볼릭 링크나 관리자 권한 없이 사용할 수 있는 실제 파일 구조입니다.
+- Windows에서도 심볼릭 링크나 관리자 권한 없이 사용할 수 있는 실제 파일 구조입니다. `.gitattributes`에는 공유 파일 경로의 LF 규칙만 병합해 체크아웃 후에도 해시가 일치하게 유지합니다.
 
 플러그인 저장소만 수정한다면 `--project .`를 생략합니다.
 스킬의 `SKILL.md`에는 `name`, `description`을 넣고 스킬 폴더 이름과 일치시킵니다.
