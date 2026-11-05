@@ -68,6 +68,7 @@ class Tree:
         self.helpers = helpers
         self.reads = {}
         self.modes = {}
+        self.retired_skills = set()
 
     def read(self, relative):
         relative = Path(relative)
@@ -210,11 +211,12 @@ def read_skills(tree, relative):
         name = valid_name(path.name)
         entry = path.relative_to(tree.root) / "SKILL.md"
         data = tree.read(entry)
-        if data is None:
+        if data is None and name not in tree.retired_skills:
             raise ValueError("skill directory has no SKILL.md: " + str(entry))
-        fields, _ = frontmatter(data, str(entry))
-        if fields["name"] != name:
-            raise ValueError("skill directory and name differ: " + str(entry))
+        if name not in tree.retired_skills:
+            fields, _ = frontmatter(data, str(entry))
+            if fields["name"] != name:
+                raise ValueError("skill directory and name differ: " + str(entry))
 
         def walk(directory):
             for child in tree.children(directory):
@@ -248,6 +250,26 @@ def load_state(tree):
                    for key, item in value[category].items()):
             raise ValueError("invalid mirror hashes in " + str(tree.root / STATE))
     return value
+
+
+def load_retirements(tree):
+    raw = tree.read("retired-skills.json")
+    if raw is None:
+        return {}
+    policy = json.loads(raw)
+    if not isinstance(policy, dict) or policy.get("schema") != 1 or not isinstance(policy.get("skills"), dict):
+        raise ValueError("invalid retired-skills.json")
+    for name, files in policy["skills"].items():
+        valid_name(name)
+        if not isinstance(files, dict) or not files:
+            raise ValueError("retired skill must record its published files: " + name)
+        for relative, expected in files.items():
+            path = Path(relative)
+            if path.is_absolute() or path.drive or not path.parts or ".." in path.parts:
+                raise ValueError("invalid retired skill path: " + relative)
+            if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                raise ValueError("invalid retired skill hash: " + relative)
+    return policy["skills"]
 
 
 def choose(label, candidates, baseline):
@@ -289,6 +311,10 @@ def synchronize(source, project, helpers, check=False):
         raise ValueError("project must be outside the plugin package")
     source_state = load_state(package)
     host_state = load_state(host) if host else None
+    retired = load_retirements(package)
+    package.retired_skills = set(retired)
+    if host:
+        host.retired_skills = set(retired)
     if host_state and (project / host_state["package"]).resolve() != source:
         raise ValueError("project mirror state points to a different package")
     source_base = source_state or {"agents": {}, "skills": {}}
@@ -326,13 +352,16 @@ def synchronize(source, project, helpers, check=False):
                                  [group.get(name) for group in skill_groups[1:]],
                                  source_base["skills"].get(name), host_base["skills"].get(name))
               for name in sorted(set(source_base["skills"]).union(host_base["skills"],
-                                 *(set(g) for g in skill_groups)))}
+                                 *(set(g) for g in skill_groups)))
+              if Path(name).parts and Path(name).parts[0] not in retired}
     # State paths are data, never paths to write without validation.
     for name in skills:
         relative = Path(name)
         if len(relative.parts) < 2 or relative.is_absolute() or ".." in relative.parts:
             raise ValueError("invalid skill state path: " + name)
         valid_name(relative.parts[0])
+        if relative.parts[0] in agents:
+            raise ValueError("developer role must be an agent, not a duplicate skill: " + relative.parts[0])
     plans = {}
 
     def plan(tree, relative, data, executable=None):
@@ -344,6 +373,19 @@ def synchronize(source, project, helpers, check=False):
         desired_mode = mode if executable is None or os.name == "nt" else (0o755 if executable else 0o644)
         if old != data or mode != desired_mode:
             plans[key] = (tree, old, data, mode, desired_mode)
+
+    retirement_trees = [(package, Path("skills"), skill_groups[0])]
+    if host:
+        retirement_trees += [(host, Path(".claude/skills"), skill_groups[1]),
+                             (host, Path(".agents/skills"), skill_groups[2])]
+    for tree, directory, files in retirement_trees:
+        for name, value in files.items():
+            parts = Path(name).parts
+            if parts[0] in retired:
+                expected = retired[parts[0]].get(Path(*parts[1:]).as_posix())
+                if digest(value) != expected:
+                    raise ValueError("retired role skill has local edits or unknown files; migrate them to its agent first: " + name)
+                plan(tree, directory / name, None)
 
     updated_team = json.loads(raw_team)
     for name, value in agents.items():
@@ -389,8 +431,23 @@ def synchronize(source, project, helpers, check=False):
         print("up-to-date: " + str(len(agents)) + " agents, " + str(len(skills)) + " skill files")
         return 0
     publish(plans, helpers)
-    for (root, relative) in plans:
-        print("mirrored " + ("package/" if root == source else "project/") + relative.as_posix())
+    # Files were explicitly retired by policy and verified before publication.
+    # Remove empty containers only; never recursively remove user data/caches.
+    for tree, directory, _ in retirement_trees:
+        for name, files in retired.items():
+            root = directory / name
+            directories = {root}
+            for published in files:
+                directories.update(root / parent for parent in Path(published).parents)
+            for relative in sorted(directories, key=lambda value: len(value.parts), reverse=True):
+                try:
+                    if tree.directory(relative) is not None:
+                        (tree.root / relative).rmdir()
+                except (OSError, ValueError):
+                    pass
+    for (root, relative), change in plans.items():
+        print(("retired " if change[2] is None else "mirrored ")
+              + ("package/" if root == source else "project/") + relative.as_posix())
     print("up-to-date: " + str(len(agents)) + " agents, " + str(len(skills)) + " skill files")
     return 0
 
@@ -431,6 +488,11 @@ def replace_file(tree, relative, expected, data, mode):
     target = tree.root / relative
     temporary = None
     try:
+        if data is None:
+            if tree.read(relative) != expected:
+                raise ValueError("destination changed during sync: " + str(relative))
+            target.unlink()
+            return
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".jgs-write-", delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(data)

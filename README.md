@@ -57,9 +57,9 @@ engine/
 └── .jaeho-studio/              # 엔진별 실제 작업 기록
 ```
 
-일곱 개발 역할과 유지보수용 `jgs-sync` 스킬이 제공됩니다.
-Codex에서는 `$jgs-director`, Claude 프로젝트에서는 `/jgs-director`로 스킬을 사용할 수 있습니다.
-실제 병렬 위임은 “jgs-director가 코어·그래픽스·에디터 에이전트에게 나누어 맡겨줘”처럼 요청합니다.
+일곱 개발 역할은 **에이전트로만** 제공하며, 스킬은 유지보수용 **`jgs-sync` 하나**입니다.
+Codex에서는 `$jgs-sync`, Claude 프로젝트에서는 `/jgs-sync`로 동기화 절차를 호출합니다.
+개발 역할의 병렬 위임은 “jgs-director가 코어·그래픽스·에디터 에이전트에게 나누어 맡겨줘”처럼 요청합니다.
 역할에 모델·추론 강도·도구·권한을 고정하지 않으므로 기존 호스트 설정을 따릅니다.
 새 Codex 에이전트를 추가하면 새 대화에서 확인하세요.
 
@@ -82,6 +82,8 @@ python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 
 플러그인 저장소만 수정한다면 `--project .`를 생략합니다.
 스킬의 `SKILL.md`에는 `name`, `description`을 넣고 스킬 폴더 이름과 일치시킵니다.
+`retired-skills.json`은 과거 역할 스킬의 배포 해시를 기록합니다. 동기화 시 변경 없는 구버전 사본과 상태 항목을 정리하여 다시 생기지 않게 합니다. 로컬 수정이나 알 수 없는 부속 파일이 있으면 먼저 에이전트 지침으로 보존하도록 충돌을 보고합니다.
+
 관리되는 에이전트는 공통 `name`·`description`·본문만 사용합니다.
 플랫폼 전용 모델·권한 필드는 다른 플랫폼으로 변환할 수 없으므로 오류를 보고하고 보존합니다.
 
@@ -96,7 +98,7 @@ python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 ## 플러그인으로 설치하기
 
 위 프로젝트용 폴더를 사용하면 별도 플러그인 설치 없이 역할을 탐색할 수 있습니다.
-여러 프로젝트에서 패키지 스킬을 쓰고 싶다면 기존 플러그인 설치 방식도 지원합니다.
+여러 프로젝트에서 동기화 스킬을 쓰고 싶다면 기존 플러그인 설치 방식도 지원합니다.
 
 ### Codex
 
@@ -106,7 +108,7 @@ codex plugin add jaeho-game-studio@jaeho-studio
 ```
 
 로컬 소스에서는 `codex plugin marketplace add .`를 사용합니다.
-Codex 플러그인 설치와 native 에이전트 등록은 별개이므로, 엔진에는 위 동기화 명령으로
+Codex 플러그인은 `jgs-sync` 스킬을 설치합니다. Native 에이전트 등록은 별개이므로, 엔진에는 위 동기화 명령으로
 `.codex/agents/`를 등록합니다. 기존 Codex 전용 설치기 `scripts/install-codex-agents.py`도 유지합니다.
 
 ### Claude Code
@@ -118,7 +120,7 @@ claude plugin install jaeho-game-studio@jaeho-studio
 
 이 패키지는 `.claude-plugin/plugin.json`, `agents/`, `skills/`를 제공합니다.
 로컬에서 설치 없이 패키지를 확인할 때는 `claude --plugin-dir ./tools/JaehoGameStudio`를 사용합니다.
-플러그인 스킬 이름에는 `/jaeho-game-studio:jgs-director`처럼 네임스페이스가 붙습니다.
+플러그인 스킬 이름에는 `/jaeho-game-studio:jgs-sync`처럼 네임스페이스가 붙습니다.
 설치 캐시는 편집 원본이 아닙니다. 변경은 서브모듈 원본 또는 위 프로젝트 사본에서 수행합니다.
 플러그인 갱신 후 새 세션이나 해당 클라이언트의 다시 로드 절차를 사용하세요.
 
@@ -139,7 +141,7 @@ claude plugin install jaeho-game-studio@jaeho-studio
 
 ## OpenClaw
 
-Agent Plugins 번들을 지원하는 OpenClaw에서는 패키지를 링크해 스킬을 사용할 수 있습니다.
+Agent Plugins 번들을 지원하는 OpenClaw에서는 패키지를 링크해 동기화 스킬을 사용할 수 있습니다. 개발자 역할은 기존 독립 에이전트 정의를 사용합니다.
 
 ```sh
 openclaw plugins install --link /absolute/path/to/JaehoGameStudio

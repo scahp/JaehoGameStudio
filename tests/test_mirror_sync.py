@@ -186,7 +186,7 @@ class MirrorSyncTests(unittest.TestCase):
         for mirror in (".agents/skills", ".claude/skills"):
             self.assertEqual(self.skill_files(self.project / mirror, name), source)
 
-    def add_resource(self, root, name="jgs-core", relative="resources/nested/원본.bin", data=b"\x00\xff\r\nresource"):
+    def add_resource(self, root, name="jgs-sync", relative="resources/nested/원본.bin", data=b"\x00\xff\r\nresource"):
         path = root / name / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -298,7 +298,7 @@ class MirrorSyncTests(unittest.TestCase):
             self.assertIsInstance(state["agents"], dict)
             self.assertIsInstance(state["skills"], dict)
             self.assertGreaterEqual(len(state["agents"]), len(self.team))
-            self.assertGreaterEqual(len(state["skills"]), 7)
+            self.assertGreaterEqual(len(state["skills"]), 1)
             check_keys(state)
 
     def test_repeat_install_and_clean_check_preserve_bytes_and_mtimes(self):
@@ -429,12 +429,12 @@ class MirrorSyncTests(unittest.TestCase):
         for index, origin in enumerate((self.package / "skills", self.project / ".agents/skills",
                                         self.project / ".claude/skills")):
             with self.subTest(origin=origin):
-                path = origin / "jgs-core/SKILL.md"
+                path = origin / "jgs-sync/SKILL.md"
                 path.write_bytes(path.read_bytes() + ("\n수정 단계 {}.\n".format(index)).encode("utf-8"))
                 self.add_resource(origin, relative="resources/nested/원본.bin", data=bytes([index, 255, 13, 10]))
-                expected = self.skill_files(origin, "jgs-core")
+                expected = self.skill_files(origin, "jgs-sync")
                 self.assert_ok(self.run_sync())
-                self.assert_skill("jgs-core", expected)
+                self.assert_skill("jgs-sync", expected)
 
     @unittest.skipUnless(os.name == "posix", "executable mode bits require POSIX")
     def test_executable_skill_resource_and_mode_only_edits_round_trip(self):
@@ -443,7 +443,7 @@ class MirrorSyncTests(unittest.TestCase):
                                    data=b"#!/bin/sh\nprintf 'core check\\n'\n")
         source.chmod(0o755)
         self.initialize()
-        paths = [root / "jgs-core" / relative for root in
+        paths = [root / "jgs-sync" / relative for root in
                  (self.package / "skills", self.project / ".agents/skills",
                   self.project / ".claude/skills")]
         for path in paths:
@@ -474,7 +474,7 @@ class MirrorSyncTests(unittest.TestCase):
                             (self.project / ".jgs-mirror.json").read_bytes())
         self.assert_ok(self.run_sync())
         self.assert_role("core", body)
-        self.assert_skill("jgs-core")
+        self.assert_skill("jgs-sync")
         self.assert_ok(self.run_sync(check=True))
 
     def test_stale_host_baseline_never_overwrites_explicit_source_agent_revert(self):
@@ -520,9 +520,9 @@ class MirrorSyncTests(unittest.TestCase):
     def test_stale_host_baseline_never_overwrites_explicit_source_skill_revert(self):
         self.add_resource(self.package / "skills")
         self.initialize()
-        skill = self.package / "skills/jgs-core/SKILL.md"
+        skill = self.package / "skills/jgs-sync/SKILL.md"
         original = skill.read_bytes()
-        expected_a = self.skill_files(self.package / "skills", "jgs-core")
+        expected_a = self.skill_files(self.package / "skills", "jgs-sync")
         host_a = snapshot(self.project)
         skill.write_bytes(original + "\n원본에서 먼저 동기화한 스킬 B.\n".encode("utf-8"))
         self.assert_ok(self.run_sync(project=False))
@@ -535,7 +535,7 @@ class MirrorSyncTests(unittest.TestCase):
             self.assertEqual(snapshot(self.root), before)
         else:
             self.assert_ok(result)
-            self.assert_skill("jgs-core", expected_a)
+            self.assert_skill("jgs-sync", expected_a)
             self.assert_ok(self.run_sync(check=True))
 
     def test_agent_edit_during_scan_is_preserved_without_sync_writes(self):
@@ -629,7 +629,7 @@ class MirrorSyncTests(unittest.TestCase):
         self.initialize()
         for mirror, suffix in ((".claude/skills", b"\nClaude edit.\n"),
                                (".agents/skills", b"\nCodex edit.\n")):
-            path = self.project / mirror / "jgs-particles/SKILL.md"
+            path = self.project / mirror / "jgs-sync/SKILL.md"
             path.write_bytes(path.read_bytes() + suffix)
         role = self.package / "roles/core.md"
         role.write_bytes(role.read_bytes() + b"\nPending agent.\n")
@@ -639,15 +639,15 @@ class MirrorSyncTests(unittest.TestCase):
         self.add_resource(self.package / "skills")
         self.initialize()
         expected_body = (self.package / "roles/core.md").read_text(encoding="utf-8")
-        expected_skill = self.skill_files(self.package / "skills", "jgs-core")
+        expected_skill = self.skill_files(self.package / "skills", "jgs-sync")
         (self.package / "roles/core.md").unlink()
         (self.package / ".codex/agents/jgs-core.toml").unlink()
         (self.project / ".claude/agents/jgs-core.md").unlink()
-        shutil.rmtree(self.package / "skills/jgs-core")
-        shutil.rmtree(self.project / ".agents/skills/jgs-core")
+        shutil.rmtree(self.package / "skills/jgs-sync")
+        shutil.rmtree(self.project / ".agents/skills/jgs-sync")
         self.assert_ok(self.run_sync())
         self.assert_role("core", expected_body)
-        self.assert_skill("jgs-core", expected_skill)
+        self.assert_skill("jgs-sync", expected_skill)
 
     def test_check_reports_missing_mirror_without_recreating_it(self):
         self.initialize()
@@ -673,7 +673,7 @@ class MirrorSyncTests(unittest.TestCase):
         self.assert_rejected_without_changes()
 
     def test_source_resource_symlink_is_rejected_even_with_internal_target(self):
-        path = self.package / "skills/jgs-core/resources/alias.md"
+        path = self.package / "skills/jgs-sync/resources/alias.md"
         self.link(path, self.package / "roles/core.md", directory=False)
         self.assert_rejected_without_changes()
 
