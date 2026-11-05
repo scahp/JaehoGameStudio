@@ -21,8 +21,6 @@ Claude Code / Codex / OpenClaw용 게임 엔진 개발 플러그인입니다.
 
 ```text
 jEngine/
-├── AGENTS.md                         # 프로젝트 규칙
-├── CLAUDE.md                         # @AGENTS.md
 ├── .agents/plugins/marketplace.json  # Codex 플러그인 경로
 ├── .codex/config.toml                # 에이전트 config_file 경로
 ├── .claude/settings.json             # Claude 마켓플레이스 경로
