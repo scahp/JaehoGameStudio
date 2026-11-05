@@ -1,0 +1,11 @@
+{
+  "name": "jaeho-game-studio",
+  "version": "1.2.0",
+  "description": "Seven game-engine development agents, shared skills and Claude Code/Codex mirroring.",
+  "author": {
+    "name": "Jaeho"
+  },
+  "homepage": "https://github.com/scahp/JaehoGameStudio",
+  "repository": "https://github.com/scahp/JaehoGameStudio",
+  "license": "MIT"
+}

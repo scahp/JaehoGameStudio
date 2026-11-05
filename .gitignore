@@ -1,6 +1,11 @@
 # Local runtime state and credentials
 .jaeho-studio/
-.codex/
+.codex/*
+!.codex/agents/
+.codex/agents/*
+!.codex/agents/jgs-*.toml
+.claude/*
+!.claude/CLAUDE.md
 .openclaw/
 sessions.json
 backups/

@@ -1,0 +1,14 @@
+{
+  "name": "jaeho-studio",
+  "description": "Shared game-engine development agents and skills for Claude Code and Codex.",
+  "owner": {
+    "name": "Jaeho"
+  },
+  "plugins": [
+    {
+      "name": "jaeho-game-studio",
+      "source": "./",
+      "description": "Game-engine role agents and shared Claude Code/Codex skills."
+    }
+  ]
+}

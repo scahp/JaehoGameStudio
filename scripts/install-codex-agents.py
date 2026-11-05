@@ -18,11 +18,13 @@ def agent_files(source_root, helpers):
     if helpers["checked_destination"](source_root, team_path) is None:
         raise ValueError("plugin team.json is missing")
     team = json.loads((source_root / team_path).read_text(encoding="utf-8"))
-    roles = helpers["ROLES"]
-    if not isinstance(team, dict) or set(team) != set(roles):
-        raise ValueError("team.json must define exactly the seven JaehoGameStudio roles")
+    if not isinstance(team, dict) or not set(helpers["ROLES"]).issubset(team):
+        raise ValueError("team.json must include the seven JaehoGameStudio roles")
+    roles = tuple(helpers["ROLES"]) + tuple(sorted(set(team) - set(helpers["ROLES"])))
     files = {}
     for role in roles:
+        if not role or any(part not in "abcdefghijklmnopqrstuvwxyz0123456789-" for part in role):
+            raise ValueError("team.json has an invalid role name")
         entry = team[role]
         if not isinstance(entry, dict) or entry.get("agent") != "jgs-" + role:
             raise ValueError("team.json has an invalid agent ID for " + role)
