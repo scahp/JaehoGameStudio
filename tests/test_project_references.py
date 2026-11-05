@@ -47,6 +47,7 @@ class ProjectReferenceTests(unittest.TestCase):
         self.expect_ok(self.sync())
         self.assert_references_only()
         config = tomllib.loads((self.project / ".codex/config.toml").read_text(encoding="utf-8"))
+        self.assertEqual(set(config), {"agents"})
         self.assertEqual(len(config["agents"]), 7)
         for name, entry in config["agents"].items():
             path = (self.project / ".codex" / entry["config_file"]).resolve()
@@ -142,7 +143,7 @@ class ProjectReferenceTests(unittest.TestCase):
         self.assertEqual(snapshot(self.project), before)
 
     def test_preserves_unrelated_settings_agents_and_context(self):
-        originals = {".codex/config.toml": b"[agents.user-role]\ndescription = 'Keep me'\n",
+        originals = {".codex/config.toml": b"[agents.user-role]\ndescription = 'Keep me'\n\n[plugins.'other-plugin@user-market']\nenabled = false\n",
                      ".codex/agents/user-role.toml": b"custom native profile\n",
                      ".claude/settings.json": b'{"permissions":{"deny":["Read(private)"]}}\n',
                      ".jaeho-studio/project.md": b"Keep existing context\n"}
@@ -155,6 +156,7 @@ class ProjectReferenceTests(unittest.TestCase):
             self.assertEqual((self.project / name).read_bytes(), originals[name])
         config = tomllib.loads((self.project / ".codex/config.toml").read_text(encoding="utf-8"))
         self.assertEqual(config["agents"]["user-role"]["description"], "Keep me")
+        self.assertEqual(config["plugins"], {"other-plugin@user-market": {"enabled": False}})
         settings = json.loads((self.project / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["permissions"], {"deny": ["Read(private)"]})
 

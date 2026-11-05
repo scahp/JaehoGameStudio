@@ -96,16 +96,9 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
     if not matches:
         entries.append(target)
         plan(".agents/plugins/marketplace.json", mirror["encoded"](marketplace))
-    plugin_id = "jaeho-game-studio@" + marketplace["name"]
+    # Plugin installation/activation belongs to the marketplace and the host's
+    # normal install action. This file only registers custom agent paths.
     block = [BEGIN]
-    if plugin_id not in parsed.get("plugins", {}):
-        block += ["[plugins." + mirror["quoted"](plugin_id) + "]", "enabled = true", ""]
-    # Prefer this project's pinned package over the package's older personal
-    # registrations. Keep explicit project overrides and other projects intact.
-    for alias in ("jaeho-personal", "jaeho-studio"):
-        alternate = "jaeho-game-studio@" + alias
-        if alternate != plugin_id and alternate not in parsed.get("plugins", {}):
-            block += ["[plugins." + mirror["quoted"](alternate) + "]", "enabled = false", ""]
     for name, value in sorted(agents.items()):
         role_path = Path(os.path.relpath(source / "codex-agents" / (name + ".toml"), project / ".codex")).as_posix()
         block += ["[agents." + name + "]", "description = " + mirror["quoted"](value["description"]),

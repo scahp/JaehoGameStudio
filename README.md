@@ -67,7 +67,10 @@ python3 tools/JaehoGameStudio/scripts/init-project.py .
 
 ## Codex에서 사용
 
-프로젝트를 신뢰한 뒤 새 세션을 엽니다. `.codex/config.toml`은 역할을 직접 참조합니다.
+플러그인 위치는 `.agents/plugins/marketplace.json` 한 곳에 등록합니다.
+설치 시 활성화는 Codex 사용자 설정에 저장합니다. 프로젝트 `.codex/config.toml`에는
+일곱 커스텀 에이전트의 경로만 두고 역할 정의는 서브모듈에서 직접 참조합니다.
+프로젝트를 신뢰한 뒤 새 세션을 엽니다.
 
 ```toml
 [agents.jgs-graphics]
