@@ -107,7 +107,9 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
         block += ["[agents." + name + "]", "description = " + mirror["quoted"](value["description"]),
                   "config_file = " + mirror["quoted"](role_path), ""]
     block += [END, ""]
-    plan(".codex/config.toml", codex_base.rstrip(b"\r\n") + (b"\n\n" if codex_base else b"") + "\n".join(block).encode("utf-8"))
+    codex_new = codex_base.rstrip(b"\r\n") + (b"\n\n" if codex_base else b"") + "\n".join(block).encode("utf-8")
+    if codex_old.replace(b"\r\n", b"\n") != codex_new.replace(b"\r\n", b"\n"):
+        plan(".codex/config.toml", codex_new)
     settings_raw = host.read(".claude/settings.json")
     settings = json.loads(settings_raw) if settings_raw else {}
     source_entry = {"source": {"source": "directory", "path": "./" + relative.as_posix()}}
@@ -119,7 +121,9 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
     settings.setdefault("enabledPlugins", {}).setdefault("jaeho-game-studio@jaeho-studio", True)
     if not settings_raw or settings != json.loads(settings_raw):
         plan(".claude/settings.json", mirror["encoded"](settings))
-    plan(mirror["STATE"], mirror["encoded"]({"schema": 2, "mode": "references", "package": relative.as_posix()}))
+    record = {"schema": 2, "mode": "references", "package": relative.as_posix()}
+    if state != record:
+        plan(mirror["STATE"], mirror["encoded"](record))
     attributes = host.read(".gitattributes")
     if attributes is not None:
         cleaned = without_block(attributes, "# BEGIN JAEHOGAMESTUDIO MIRRORS", "# END JAEHOGAMESTUDIO MIRRORS")

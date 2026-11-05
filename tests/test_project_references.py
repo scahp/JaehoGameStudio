@@ -65,6 +65,16 @@ class ProjectReferenceTests(unittest.TestCase):
         self.expect_ok(self.sync("--check"))
         self.assertEqual(snapshot(self.project), before)
 
+    def test_crlf_checkout_keeps_reference_checks_and_setup_read_only(self):
+        self.expect_ok(self.sync())
+        for name in (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json", ".jgs-mirror.json"):
+            path = self.project / name
+            path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+        before = snapshot(self.project)
+        self.expect_ok(self.sync("--check"))
+        self.expect_ok(self.sync())
+        self.assertEqual(snapshot(self.project), before)
+
     def test_ordinary_skill_and_role_edits_need_no_project_definition_update(self):
         self.expect_ok(self.sync())
         paths = (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json", ".jgs-mirror.json")
