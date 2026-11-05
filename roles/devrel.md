@@ -37,7 +37,8 @@
 ## 에이전트와 스킬 미러링
 
 Claude Code 또는 Codex에서 에이전트·스킬을 추가하거나 수정하면 반대쪽에도 반영한다.
-프로젝트 `.jgs-mirror.json`의 `package` 경로에 있는 `scripts/sync-studio.py`를
+프로젝트 `.agents/plugins/marketplace.json`의 `jaeho-game-studio` 항목에서
+`source.path`로 원본을 찾고, 그 안의 `scripts/sync-studio.py`를
 Python 3.11 이상으로 실행하고 `--check`로 확인한다. 프로젝트 경로 등록 검사에는
 `--project <프로젝트>`를 추가한다. 원본은 패키지의 `agents/`, `codex-agents/`,
 `skills/`에 두며 프로젝트에 정의를 복사하거나 심볼릭 링크를 만들지 않는다.

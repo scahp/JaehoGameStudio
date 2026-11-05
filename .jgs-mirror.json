@@ -1,16 +1,16 @@
 {
   "agents": {
-    "jgs-core": "5f117bd83565c069418c1d5d4c1233415f3e1c6d89ef77e909572b69de78330a",
-    "jgs-devrel": "311329c44ed311e785a85f8b3fce236e6d9618f2979ae9b91714495799009d55",
-    "jgs-director": "7b80b480e0733de72aec9f5f9b6f7e16369b793f5fba7158633316dc843cfd96",
-    "jgs-editor": "c573f142b431d1d979b4ff141e9f09fac4d9b02e73265ce9d6c9a99fff457556",
-    "jgs-graphics": "2e85a20979a0310d81392965f6b7b85cc359a298378271d4f03ffd7879e2c0ea",
-    "jgs-network": "6259632279bc0e046e2e6f0ef37bab0fc0efd7f348b8f9393fd8e4f0f27a8e27",
-    "jgs-particles": "827ad2b652d6309493f1016208a9c085edaae065f02fdff349246cb9edba8faf"
+    "jgs-core": "be744447cb030ae6258ade3c8d7683aae9273cc1b1fb7b5b71112340f89128e9",
+    "jgs-devrel": "8bca2e232896eb88da9c1157d3af5983722dfbd9c9f189ca5e458b2fd3ff620c",
+    "jgs-director": "647d0a82751550b4b00daae269225901656dfa1e4c7b2fddbd7caccd3a95744c",
+    "jgs-editor": "6f48367e69dadd53f5ea555a9abc20a61e2cec6349f723278783a9a0bc1a2e2a",
+    "jgs-graphics": "d58e42688a5cc10b17c607ed8cf7217bbad4d31b9f3cd82e27db1c50d47d5341",
+    "jgs-network": "94ffa42f8071571b0c6b702f76912b7327fde24b86a1c55d1f1a50cf8d89a5d6",
+    "jgs-particles": "b89b3cfc8a45befe9a200c079dd49bc7df3bb3007ce1fb1c248e89d664859d22"
   },
   "package": ".",
   "schema": 1,
   "skills": {
-    "jgs-sync/SKILL.md": "a4758c75e03b2f42868f55d71af58fa11568a0fb0d7c24841c274973da5267f5"
+    "jgs-sync/SKILL.md": "9b12c457760335aabbd6c0ce728a6c369264367efe828ac720cfc8708b7e6515"
   }
 }

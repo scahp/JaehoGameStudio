@@ -16,7 +16,8 @@ Claude Code / Codex / OpenClaw용 게임 엔진 개발 플러그인입니다.
 ## 디렉터리 구성
 
 프로젝트에는 **경로 등록만**, 모든 에이전트·스킬·도구는 **서브모듈 안에** 둡니다.
-심볼릭 링크·정션과 프로젝트 정의 복사본을 사용하지 않습니다.
+심볼릭 링크·정션과 프로젝트 정의 복사본을 사용하지 않습니다. 플러그인 경로는
+마켓플레이스 설정에 이미 있으므로 엔진 루트에 별도 상태 파일을 만들지 않습니다.
 
 ```text
 jEngine/
@@ -25,7 +26,6 @@ jEngine/
 ├── .agents/plugins/marketplace.json  # Codex 플러그인 경로
 ├── .codex/config.toml                # 에이전트 config_file 경로
 ├── .claude/settings.json             # Claude 마켓플레이스 경로
-├── .jgs-mirror.json                  # 서브모듈 상대 경로만 기록
 ├── tools/JaehoGameStudio/            # Git 서브모듈
 │   ├── plugin.json                   # Codex/OpenClaw 플러그인
 │   ├── .claude-plugin/

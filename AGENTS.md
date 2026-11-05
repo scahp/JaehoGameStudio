@@ -17,8 +17,9 @@ python3 scripts/sync-studio.py
 python3 scripts/sync-studio.py --check
 ```
 
-When working from an engine, find the source through `.jgs-mirror.json`'s
-`package` path. Adding `--project <engine>` also checks or updates its path
+When working from an engine, find the source through the `jaeho-game-studio`
+entry in `.agents/plugins/marketplace.json` and its `source.path`. Do not create
+a separate state file in the consuming project root. Adding `--project <engine>` also checks or updates its path
 registrations. Ordinary role-body and skill edits stay inside the submodule.
 Never edit a client's installed plugin cache. The explicit `--legacy-copies`
 option exists only for old clients and regression coverage, not new projects.

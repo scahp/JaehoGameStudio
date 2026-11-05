@@ -314,6 +314,8 @@ def choose_mirror(label, source_values, host_values, source_hash, host_hash):
 
 
 def synchronize(source, project, helpers, check=False):
+    if project is not None and helpers["uses_studio_references"](project):
+        raise ValueError("project uses path references; copied synchronization is disabled")
     package = Tree(source, helpers)
     host = None if project is None else Tree(project, helpers)
     if project is not None and (project == source or project.is_relative_to(source)):

@@ -41,8 +41,7 @@ class ProjectReferenceTests(unittest.TestCase):
             self.assertFalse(path.exists() and any(p.is_file() for p in path.rglob("*")), directory)
         self.assertFalse(any(p.is_symlink() for p in self.project.rglob("*")))
         self.assertTrue((self.package / "skills/jgs-sync/SKILL.md").is_file())
-        state = json.loads((self.project / ".jgs-mirror.json").read_text(encoding="utf-8"))
-        self.assertEqual(state, {"schema": 2, "mode": "references", "package": "tools/studio package"})
+        self.assertFalse((self.project / ".jgs-mirror.json").exists())
 
     def test_default_setup_registers_native_paths_and_never_copies_definitions(self):
         self.expect_ok(self.sync())
@@ -65,9 +64,33 @@ class ProjectReferenceTests(unittest.TestCase):
         self.expect_ok(self.sync("--check"))
         self.assertEqual(snapshot(self.project), before)
 
+    def test_former_root_path_record_is_removed_once_without_recreation(self):
+        self.expect_ok(self.sync())
+        state = self.project / ".jgs-mirror.json"
+        state.write_bytes((json.dumps({"schema": 2, "mode": "references", "package": "tools/studio package"}) + "\r\n").encode("utf-8"))
+        before = snapshot(self.project)
+        self.assertEqual(self.sync("--check").returncode, 1)
+        self.assertEqual(snapshot(self.project), before)
+        self.expect_ok(self.sync())
+        self.assert_references_only()
+        self.assertTrue((self.package / ".jgs-mirror.json").is_file())
+        after = snapshot(self.project)
+        self.expect_ok(self.sync())
+        self.expect_ok(self.sync("--check"))
+        self.assertEqual(snapshot(self.project), after)
+
+    def test_unrecognized_root_metadata_is_preserved_before_any_changes(self):
+        state = self.project / ".jgs-mirror.json"
+        state.write_bytes(b'{"custom": "keep"}\n')
+        before = snapshot(self.project)
+        result = self.sync()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"invalid former project registration", result.stderr)
+        self.assertEqual(snapshot(self.project), before)
+
     def test_crlf_checkout_keeps_reference_checks_and_setup_read_only(self):
         self.expect_ok(self.sync())
-        for name in (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json", ".jgs-mirror.json"):
+        for name in (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json"):
             path = self.project / name
             path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
         before = snapshot(self.project)
@@ -77,7 +100,7 @@ class ProjectReferenceTests(unittest.TestCase):
 
     def test_ordinary_skill_and_role_edits_need_no_project_definition_update(self):
         self.expect_ok(self.sync())
-        paths = (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json", ".jgs-mirror.json")
+        paths = (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json")
         before = {name: (self.project / name).read_bytes() for name in paths}
         skill = self.package / "skills/jgs-sync/SKILL.md"
         skill.write_text(skill.read_text(encoding="utf-8") + "\nReference layout regression.\n", encoding="utf-8")

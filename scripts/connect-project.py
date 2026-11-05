@@ -35,7 +35,11 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
     if not agents:
         raise ValueError("package has no Codex agents")
     state_raw = host.read(mirror["STATE"])
-    state = json.loads(state_raw) if state_raw else None
+    # Read former state only to migrate it away; native configuration already
+    # records the package path and is the source of truth for new projects.
+    state = json.loads(state_raw) if state_raw is not None else None
+    if state_raw is not None and (not isinstance(state, dict) or state.get("schema") not in (1, 2)):
+        raise ValueError("invalid former project registration; file preserved")
     if state and (project / state.get("package", "")).resolve() != source:
         raise ValueError("project registration points to a different package")
     plans = {}
@@ -121,9 +125,8 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
     settings.setdefault("enabledPlugins", {}).setdefault("jaeho-game-studio@jaeho-studio", True)
     if not settings_raw or settings != json.loads(settings_raw):
         plan(".claude/settings.json", mirror["encoded"](settings))
-    record = {"schema": 2, "mode": "references", "package": relative.as_posix()}
-    if state != record:
-        plan(mirror["STATE"], mirror["encoded"](record))
+    if state_raw is not None:
+        plan(mirror["STATE"], None)
     attributes = host.read(".gitattributes")
     if attributes is not None:
         cleaned = without_block(attributes, "# BEGIN JAEHOGAMESTUDIO MIRRORS", "# END JAEHOGAMESTUDIO MIRRORS")

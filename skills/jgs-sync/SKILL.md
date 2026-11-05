@@ -5,7 +5,8 @@ description: JaehoGameStudio의 Claude Code·Codex 에이전트와 스킬을 양
 
 # Claude Code와 Codex 미러링
 
-프로젝트 `.jgs-mirror.json`의 `package` 상대 경로로 원본을 찾는다.
+프로젝트 `.agents/plugins/marketplace.json`에서 `jaeho-game-studio`의
+`source.path` 상대 경로로 원본을 찾는다. 별도 루트 상태 파일은 만들지 않는다.
 패키지 안에서 작업하면 `team.json`이 있는 루트가 원본이다.
 설치 캐시와 사용자 전역 폴더는 편집 원본이 아니다.
 

@@ -48,6 +48,16 @@ def checked_destination(project, relative, directory=False):
     return info
 
 
+def uses_studio_references(project):
+    """Identify the existing native registration without a separate state file."""
+    relative = Path(".codex/config.toml")
+    if checked_destination(project, relative) is None:
+        return False
+    lines = (project / relative).read_text(encoding="utf-8").splitlines()
+    return ("# BEGIN JAEHOGAMESTUDIO REFERENCES" in lines
+            and "# END JAEHOGAMESTUDIO REFERENCES" in lines)
+
+
 def _same_file(path, identity):
     try:
         actual = path.lstat()

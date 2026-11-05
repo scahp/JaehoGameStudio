@@ -56,6 +56,8 @@ def main(argv=None):
         # its CLI. Installing agents never initializes .jaeho-studio context.
         helpers = runpy.run_path(str(Path(__file__).with_name("init-project.py")))
         project = helpers["resolve_project"](args.project)
+        if helpers["uses_studio_references"](project):
+            raise ValueError("project uses path references; copied agent installation is disabled")
         state_path = Path(".jgs-mirror.json")
         if helpers["checked_destination"](project, state_path) is not None:
             state = json.loads((project / state_path).read_text(encoding="utf-8"))
