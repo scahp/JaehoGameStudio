@@ -103,7 +103,7 @@ class MirrorSyncTests(unittest.TestCase):
     def run_sync(self, project=True, check=False):
         command = [sys.executable, str(self.package / "scripts" / "sync-studio.py")]
         if project is not False and project is not None:
-            command.extend(["--project", str(self.project if project is True else project)])
+            command.extend(["--project", str(self.project if project is True else project), "--legacy-copies"])
         if check:
             command.append("--check")
         env = os.environ.copy()
@@ -171,7 +171,14 @@ class MirrorSyncTests(unittest.TestCase):
             # Model, reasoning, permissions and tools inherit from the host.
             self.assertEqual(fields, {"name": name, "description": description})
             self.assertEqual(actual_body, body)
-            codex = tomllib.loads((root / ".codex/agents" / (name + ".toml")).read_text(encoding="utf-8"))
+            text = (root / ("codex-agents" if root == self.package else ".codex/agents") / (name + ".toml")).read_text(encoding="utf-8")
+            codex = tomllib.loads(text)
+            if root == self.package:
+                self.assertEqual(set(codex), {"developer_instructions"})
+                for line in text.splitlines():
+                    if line.startswith(("# name = ", "# description = ")):
+                        key, value = line[2:].split(" = ", 1)
+                        codex[key] = json.loads(value)
             self.assertEqual(codex, {"name": name, "description": description,
                                      "developer_instructions": body})
 
@@ -241,7 +248,7 @@ class MirrorSyncTests(unittest.TestCase):
         self.assertEqual(snapshot(self.home), self.home_before)
 
     def test_source_only_bootstraps_missing_native_agents(self):
-        for directory in (self.package / "agents", self.package / ".codex/agents"):
+        for directory in (self.package / "agents", self.package / "codex-agents"):
             if directory.exists():
                 shutil.rmtree(directory)
         before_roles = snapshot(self.package / "roles")
@@ -586,7 +593,7 @@ class MirrorSyncTests(unittest.TestCase):
         self.initialize()
         cases = (
             (self.project / ".claude/agents/jgs-audio.md", write_claude, "audio"),
-            (self.package / ".codex/agents/jgs-build.toml", write_codex, "build"),
+            (self.package / "codex-agents/jgs-build.toml", write_codex, "build"),
         )
         for path, writer, role in cases:
             writer(path, "jgs-" + role, "새 역할 " + role, "# " + role + "\n\n동적 역할 본문.\n")
@@ -641,7 +648,7 @@ class MirrorSyncTests(unittest.TestCase):
         expected_body = (self.package / "roles/core.md").read_text(encoding="utf-8")
         expected_skill = self.skill_files(self.package / "skills", "jgs-sync")
         (self.package / "roles/core.md").unlink()
-        (self.package / ".codex/agents/jgs-core.toml").unlink()
+        (self.package / "codex-agents/jgs-core.toml").unlink()
         (self.project / ".claude/agents/jgs-core.md").unlink()
         shutil.rmtree(self.package / "skills/jgs-sync")
         shutil.rmtree(self.project / ".agents/skills/jgs-sync")

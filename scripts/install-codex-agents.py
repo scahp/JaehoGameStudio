@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create project-local Codex role profiles; preserve existing custom profiles."""
+"""Legacy copied Codex profiles; unavailable in projects using path references."""
 import argparse
 import json
 from pathlib import Path
@@ -56,6 +56,11 @@ def main(argv=None):
         # its CLI. Installing agents never initializes .jaeho-studio context.
         helpers = runpy.run_path(str(Path(__file__).with_name("init-project.py")))
         project = helpers["resolve_project"](args.project)
+        state_path = Path(".jgs-mirror.json")
+        if helpers["checked_destination"](project, state_path) is not None:
+            state = json.loads((project / state_path).read_text(encoding="utf-8"))
+            if isinstance(state, dict) and state.get("mode") == "references":
+                raise ValueError("project uses path references; copied agent installation is disabled")
         files = agent_files(Path(__file__).resolve().parents[1], helpers)
         for status, name in helpers["publish_files"](project, files, require_identical=True):
             print(status + " " + name.as_posix())

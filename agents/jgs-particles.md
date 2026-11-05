@@ -42,7 +42,9 @@ description: "효과 저작 데이터와 CPU/GPU 파티클 시뮬레이션을 �
 
 Claude Code 또는 Codex에서 에이전트·스킬을 추가하거나 수정하면 반대쪽에도 반영한다.
 프로젝트 `.jgs-mirror.json`의 `package` 경로에 있는 `scripts/sync-studio.py`를
-Python 3.11 이상으로 `--project <프로젝트>`와 함께 실행하고 `--check`로 확인한다.
+Python 3.11 이상으로 실행하고 `--check`로 확인한다. 프로젝트 경로 등록 검사에는
+`--project <프로젝트>`를 추가한다. 원본은 패키지의 `agents/`, `codex-agents/`,
+`skills/`에 두며 프로젝트에 정의를 복사하거나 심볼릭 링크를 만들지 않는다.
 패키지만 작업하면 `--project`를 생략한다. 새 `jgs-*` 에이전트와 새 스킬도 포함하며,
 충돌은 덮어쓰지 않고 검토한다. 설치 캐시·전역 설정은 수정하지 않는다.
 자세한 절차는 `jgs-sync` 스킬을 따른다.

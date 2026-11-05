@@ -48,7 +48,7 @@ class RoleSkillRetirementTests(unittest.TestCase):
 
     def run_sync(self, check=False):
         command = [sys.executable, str(self.package / "scripts/sync-studio.py"),
-                   "--project", str(self.project)]
+                   "--project", str(self.project), "--legacy-copies"]
         if check:
             command.append("--check")
         environment = os.environ.copy()
@@ -97,7 +97,7 @@ class RoleSkillRetirementTests(unittest.TestCase):
         self.seed_old_manifests()
 
     def native_snapshots(self):
-        paths = (self.package / "agents", self.package / ".codex/agents",
+        paths = (self.package / "agents", self.package / "codex-agents",
                  self.project / ".claude/agents", self.project / ".codex/agents")
         return {path: snapshot(path) for path in paths}
 
@@ -116,7 +116,7 @@ class RoleSkillRetirementTests(unittest.TestCase):
         self.assert_success(self.run_sync())
         expected = {"jgs-" + role for role in ROLES}
         for root, relative, suffix in ((self.package, "agents", ".md"),
-                                       (self.package, ".codex/agents", ".toml"),
+                                       (self.package, "codex-agents", ".toml"),
                                        (self.project, ".claude/agents", ".md"),
                                        (self.project, ".codex/agents", ".toml")):
             self.assertEqual({path.stem for path in (root / relative).glob("jgs-*" + suffix)}, expected)

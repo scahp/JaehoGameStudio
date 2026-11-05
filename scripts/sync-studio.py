@@ -165,7 +165,15 @@ def native_profile(data, relative, claude):
         fields, body = frontmatter(data, str(relative), agent=True)
         result = profile(fields["name"], fields["description"], body)
     else:
-        fields = tomllib.loads(data.decode("utf-8"))
+        text = data.decode("utf-8")
+        fields = tomllib.loads(text)
+        # config_file reads a regular Codex configuration layer. Metadata is
+        # kept in comments so it cannot become unknown runtime config keys.
+        if set(fields) == {"developer_instructions"}:
+            for key, value in re.findall(r"^# (name|description) = (.+)$", text, re.MULTILINE):
+                if key in fields:
+                    raise ValueError("duplicate role metadata: " + str(relative))
+                fields[key] = json.loads(value)
         if set(fields) != {"name", "description", "developer_instructions"}:
             raise ValueError("managed Codex agents support name, description and developer_instructions only: "
                              + str(relative))
@@ -175,12 +183,13 @@ def native_profile(data, relative, claude):
     return result
 
 
-def render_profile(value, claude):
+def render_profile(value, claude, config_layer=False):
     if claude:
         text = ("---\nname: " + quoted(value["name"]) + "\ndescription: "
                 + quoted(value["description"]) + "\n---\n\n" + value["instructions"])
     else:
-        text = ("name = " + quoted(value["name"]) + "\ndescription = "
+        prefix = "# " if config_layer else ""
+        text = (prefix + "name = " + quoted(value["name"]) + "\n" + prefix + "description = "
                 + quoted(value["description"]) + "\ndeveloper_instructions = "
                 + quoted(value["instructions"]) + "\n")
     return text.encode("utf-8")
@@ -333,7 +342,7 @@ def synchronize(source, project, helpers, check=False):
         if body is not None:
             canonical[name] = profile(name, entry.get("purpose"), body)
     agent_groups = [canonical, read_agents(package, Path("agents"), True),
-                    read_agents(package, Path(".codex/agents"), False)]
+                    read_agents(package, Path("codex-agents"), False)]
     if host:
         agent_groups += [read_agents(host, Path(".claude/agents"), True),
                          read_agents(host, Path(".codex/agents"), False)]
@@ -394,7 +403,7 @@ def synchronize(source, project, helpers, check=False):
         entry["purpose"] = value["description"]
         plan(package, Path("roles") / (role + ".md"), value["instructions"].encode("utf-8"))
         plan(package, Path("agents") / (name + ".md"), render_profile(value, True))
-        plan(package, Path(".codex/agents") / (name + ".toml"), render_profile(value, False))
+        plan(package, Path("codex-agents") / (name + ".toml"), render_profile(value, False, config_layer=True))
         if host:
             plan(host, Path(".claude/agents") / (name + ".md"), render_profile(value, True))
             plan(host, Path(".codex/agents") / (name + ".toml"), render_profile(value, False))
@@ -507,7 +516,8 @@ def replace_file(tree, relative, expected, data, mode):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--project", type=Path, help="also mirror into this existing engine project")
+    parser.add_argument("--project", type=Path, help="register package paths in this engine project")
+    parser.add_argument("--legacy-copies", action="store_true", help="explicit compatibility mode for older copied projects")
     parser.add_argument("--check", action="store_true", help="report drift without changing any files")
     args = parser.parse_args(argv)
     if tomllib is None:
@@ -523,6 +533,13 @@ def main(argv=None):
                     & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
                 raise ValueError("project is a symlink or junction; select its real directory")
         project = None if args.project is None else helpers["resolve_project"](args.project)
+        if project is not None and not args.legacy_copies:
+            connector = runpy.run_path(str(Path(__file__).with_name("connect-project.py")))
+            # Validate migration before changing even the package's own mirrors.
+            connector["connect"](source, project, globals(), helpers, check=True, quiet=True)
+            package_result = synchronize(source, None, helpers, args.check)
+            project_result = connector["connect"](source, project, globals(), helpers, check=args.check)
+            return max(package_result, project_result)
         return synchronize(source, project, helpers, args.check)
     except (OSError, ValueError, TypeError, KeyError) as error:
         # Relative component names keep ordinary success output safe for Windows
