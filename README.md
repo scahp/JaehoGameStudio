@@ -22,6 +22,7 @@ Claude Code / Codex / OpenClaw용 게임 엔진 개발 플러그인입니다.
 ```text
 jEngine/
 ├── .agents/plugins/marketplace.json  # Codex 플러그인 경로
+├── .codex/config.toml                # Codex 에이전트 경로 등록
 ├── .claude/settings.json             # Claude 마켓플레이스 경로
 ├── tools/JaehoGameStudio/            # Git 서브모듈
 │   ├── plugin.json                   # Codex/OpenClaw 플러그인
@@ -66,8 +67,23 @@ python3 tools/JaehoGameStudio/scripts/init-project.py .
 
 ## Codex에서 사용
 
-프로젝트에는 `.agents/plugins/marketplace.json`으로 플러그인 경로만 등록합니다.
-프로젝트 `.codex` 폴더는 만들지 않습니다. 설치 시 활성화는 Codex 사용자 설정에 저장합니다.
+플러그인 위치는 `.agents/plugins/marketplace.json`에 등록하고, 일곱 커스텀
+에이전트는 공식 `config_file` 설정으로 `.codex/config.toml`에 등록합니다.
+프로젝트를 신뢰하고 서브모듈을 초기화하면 역할 정의를 직접 참조합니다.
+모델·추론 강도·권한은 기존 호스트 설정을 따릅니다.
+
+```toml
+# .codex/config.toml
+[agents.jgs-graphics]
+description = "렌더러, GPU 자원과 그래픽스 파이프라인을 개발한다."
+config_file = "../tools/JaehoGameStudio/codex-agents/jgs-graphics.toml"
+```
+
+설정 도구는 같은 방식으로 일곱 역할을 등록합니다. 정의 파일은 복사하지 않으며
+심볼릭 링크나 프로젝트별 상태 파일도 만들지 않습니다. 새 역할을 추가한 뒤에는
+`sync-studio.py --project .`로 경로 등록을 갱신하고 새 세션에서 확인합니다.
+
+스킬 플러그인 설치·활성화는 별도의 표준 설치 명령을 사용합니다.
 
 ```sh
 codex plugin marketplace add .
@@ -76,21 +92,6 @@ codex plugin add jaeho-game-studio@jengine-tools
 
 위 이름은 jEngine의 마켓플레이스 이름입니다. 다른 프로젝트의 기본 이름은
 `project-tools`이며 해당 마켓플레이스의 `name`을 사용합니다.
-
-**플러그인 등록과 커스텀 에이전트 등록은 별개입니다.** 이 패키지의 스킬은
-플러그인으로 로드하지만 `.agents`만으로 `codex-agents/`의 일곱 역할을 자동 등록하지는
-않습니다. Codex 커스텀 에이전트가 필요하면 호스트의 기존 등록을 사용하거나 사용자
-설정에 별도로 등록합니다. 프로젝트 설정 도구가 전역 설정을 자동 변경하지 않습니다.
-
-사용자 설정에서 원본을 직접 참조하는 예시는 다음과 같습니다.
-
-```toml
-# ~/.codex/config.toml (프로젝트 밖의 사용자 설정)
-[agents.jgs-graphics]
-description = "렌더러, GPU 자원과 그래픽스 파이프라인을 개발한다."
-config_file = "/absolute/path/to/engine/tools/JaehoGameStudio/codex-agents/jgs-graphics.toml"
-```
-
 역할 TOML의 실행 설정은 `developer_instructions`뿐입니다.
 이름·설명은 미러링용 주석이며 모델이나 권한을 덮어쓰지 않습니다.
 
@@ -124,7 +125,7 @@ python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 
 - Claude `agents/` ↔ Codex `codex-agents/` ↔ 공통 `roles/`·`team.json`을 비교합니다.
 - 충돌은 쓰기 전에 보고하며 파일 시간으로 승자를 정하지 않습니다.
-- `--check`는 읽기 전용입니다. 새 역할은 패키지 내부 형식에 반영하며 호스트 등록은 별도입니다.
+- `--check`는 읽기 전용입니다. 새 역할은 패키지 내부 형식과 프로젝트 경로 등록에 반영합니다.
 - 기존 역할 본문·공통 스킬 업데이트는 서브모듈 안에서 끝납니다.
 - 삭제·이름 변경은 별도 검토합니다. 개발 역할은 에이전트로만 제공합니다.
 
@@ -143,7 +144,7 @@ git submodule update --init -- tools/JaehoGameStudio
 ```
 
 역할 본문과 공통 스킬은 새 세션에서 갱신된 원본을 읽습니다. 새 역할 이름·설명은 패키지에
-커밋하며 호스트의 에이전트 등록은 별도로 관리합니다. 패키지 커밋을 먼저 푸시하고 부모의
+커밋하고 프로젝트 경로 등록도 서브모듈 포인터와 함께 갱신합니다. 패키지 커밋을 먼저 푸시하고 부모의
 서브모듈 포인터를 갱신합니다.
 
 실제 결정, 계약, 역할별 체크포인트는 프로젝트 `.jaeho-studio/`에 둡니다.

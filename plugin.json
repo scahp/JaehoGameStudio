@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "jaeho-game-studio",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "JaehoGameStudio: 개인 게임 엔진 개발을 위한 역할별 에이전트 7명과 프로젝트 컨텍스트 유지 워크플로",
   "extensions": {
     "com.openai": {

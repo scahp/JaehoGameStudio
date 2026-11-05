@@ -22,9 +22,9 @@ python3 <package>/scripts/sync-studio.py
 python3 <package>/scripts/sync-studio.py --check
 ```
 
-프로젝트 플러그인 경로도 검사하려면 두 명령에 `--project <engine>`을 추가한다.
-이 명령은 프로젝트 `.codex`를 만들지 않으며 Codex 호스트의 에이전트 등록은
-별도 설정이다. 프로젝트에 정의를 복사하거나 심볼릭 링크·정션을 만들지 않는다.
+프로젝트 등록도 검사하려면 두 명령에 `--project <engine>`을 추가한다.
+`.agents/plugins/marketplace.json`에 플러그인 경로를 등록하고
+`.codex/config.toml`에는 에이전트의 상대 `config_file` 경로를 등록한다. 프로젝트에 정의를 복사하거나 심볼릭 링크·정션을 만들지 않는다.
 구버전 복사본에 로컬 수정이
 있으면 삭제 전에 패키지에 보존하고 충돌을 해결한다.
 
