@@ -1,5 +1,7 @@
 # JaehoGameStudio
 
+AI plugins for game-engine development with Codex and OpenClaw.
+
 개인 게임 엔진 개발을 위한 **Codex / OpenClaw 에이전트 플러그인**입니다. 일곱 역할의 지침과 프로젝트별 체크포인트를 공유합니다. 엔진 실행 파일에 링크하는 라이브러리는 아니며, 엔진 저장소의 개발 도구로 사용합니다.
 
 | 에이전트 | 책임 |
