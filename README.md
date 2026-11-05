@@ -62,7 +62,14 @@ python3 tools/JaehoGameStudio/scripts/install-codex-agents.py .
 python3 tools/JaehoGameStudio/scripts/init-project.py .
 ```
 
-jEngine의 Plugins 소스 **jEngine development tools**에서 설치하거나, CLI에서 `codex plugin add jaeho-game-studio@jengine-tools`를 실행합니다. 새 프로젝트에 서브모듈을 처음 추가할 때는 `git submodule add https://github.com/scahp/JaehoGameStudio.git tools/JaehoGameStudio`를 사용합니다.
+jEngine의 Plugins 소스 **jEngine development tools**에서 설치할 수 있습니다. CLI에서는 jEngine 루트에서 먼저 마켓플레이스를 등록합니다.
+
+```sh
+codex plugin marketplace add .
+codex plugin add jaeho-game-studio@jengine-tools
+```
+
+새 프로젝트에 서브모듈을 처음 추가할 때는 `git submodule add https://github.com/scahp/JaehoGameStudio.git tools/JaehoGameStudio`를 사용합니다.
 
 엔진은 플러그인 버전을 Git 커밋으로 고정합니다. 플러그인 원격 `main`이 갱신되어도 엔진의 포인터는 자동 변경되지 않습니다. 업데이트할 때는 새 커밋을 검토하고 서브모듈 포인터를 함께 커밋하세요. 엔진 빌드에는 이 Python/스킬 패키지가 필요하지 않습니다.
 
