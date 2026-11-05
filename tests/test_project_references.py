@@ -42,17 +42,16 @@ class ProjectReferenceTests(unittest.TestCase):
         self.assertFalse(any(p.is_symlink() for p in self.project.rglob("*")))
         self.assertTrue((self.package / "skills/jgs-sync/SKILL.md").is_file())
         self.assertFalse((self.project / ".jgs-mirror.json").exists())
+        self.assertFalse((self.project / ".codex").exists())
 
     def test_default_setup_registers_native_paths_and_never_copies_definitions(self):
         self.expect_ok(self.sync())
         self.assert_references_only()
-        config = tomllib.loads((self.project / ".codex/config.toml").read_text(encoding="utf-8"))
-        self.assertEqual(set(config), {"agents"})
-        self.assertEqual(len(config["agents"]), 7)
-        for name, entry in config["agents"].items():
-            path = (self.project / ".codex" / entry["config_file"]).resolve()
-            self.assertEqual(path, self.package / "codex-agents" / (name + ".toml"))
-            # A config_file must contain supported runtime configuration only.
+        catalog = json.loads((self.project / ".agents/plugins/marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual(catalog["plugins"][0]["source"]["path"], "./tools/studio package")
+        profiles = list((self.package / "codex-agents").glob("jgs-*.toml"))
+        self.assertEqual(len(profiles), 7)
+        for path in profiles:
             self.assertEqual(set(tomllib.loads(path.read_text(encoding="utf-8"))), {"developer_instructions"})
         settings = json.loads((self.project / ".claude/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["extraKnownMarketplaces"]["jaeho-studio"]["source"]["path"],
@@ -89,9 +88,20 @@ class ProjectReferenceTests(unittest.TestCase):
         self.assertIn(b"invalid former project registration", result.stderr)
         self.assertEqual(snapshot(self.project), before)
 
+    def test_former_managed_codex_folder_is_removed_and_not_recreated(self):
+        config = self.project / ".codex/config.toml"
+        config.parent.mkdir()
+        config.write_text('# Codex agent paths\n\n# BEGIN JAEHOGAMESTUDIO REFERENCES\n[agents.jgs-core]\nconfig_file = "../tools/studio package/codex-agents/jgs-core.toml"\n# END JAEHOGAMESTUDIO REFERENCES\n', encoding="utf-8")
+        self.expect_ok(self.sync())
+        self.assert_references_only()
+        before = snapshot(self.project)
+        self.expect_ok(self.sync())
+        self.expect_ok(self.sync("--check"))
+        self.assertEqual(snapshot(self.project), before)
+
     def test_crlf_checkout_keeps_reference_checks_and_setup_read_only(self):
         self.expect_ok(self.sync())
-        for name in (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json"):
+        for name in (".claude/settings.json", ".agents/plugins/marketplace.json"):
             path = self.project / name
             path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
         before = snapshot(self.project)
@@ -101,7 +111,7 @@ class ProjectReferenceTests(unittest.TestCase):
 
     def test_ordinary_skill_and_role_edits_need_no_project_definition_update(self):
         self.expect_ok(self.sync())
-        paths = (".codex/config.toml", ".claude/settings.json", ".agents/plugins/marketplace.json")
+        paths = (".claude/settings.json", ".agents/plugins/marketplace.json")
         before = {name: (self.project / name).read_bytes() for name in paths}
         skill = self.package / "skills/jgs-sync/SKILL.md"
         skill.write_text(skill.read_text(encoding="utf-8") + "\nReference layout regression.\n", encoding="utf-8")
@@ -111,13 +121,12 @@ class ProjectReferenceTests(unittest.TestCase):
         self.assertEqual({name: (self.project / name).read_bytes() for name in paths}, before)
         self.assert_references_only()
 
-    def test_new_agent_is_registered_by_path(self):
+    def test_new_agent_stays_in_package_without_project_codex(self):
         self.expect_ok(self.sync())
         write_claude(self.package / "agents/jgs-build.md", "jgs-build", "Build role", "Build instructions.\n")
         self.expect_ok(self.sync())
-        config = tomllib.loads((self.project / ".codex/config.toml").read_text(encoding="utf-8"))
-        self.assertEqual(config["agents"]["jgs-build"]["config_file"],
-                         "../tools/studio package/codex-agents/jgs-build.toml")
+        profile = tomllib.loads((self.package / "codex-agents/jgs-build.toml").read_text(encoding="utf-8"))
+        self.assertEqual(profile["developer_instructions"], "Build instructions.\n")
         self.assert_references_only()
 
     def test_unchanged_old_copies_are_migrated_and_cannot_be_recreated(self):

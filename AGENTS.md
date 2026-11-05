@@ -3,6 +3,8 @@
 This repository is the complete shared plugin. Consuming projects register its
 relative path. Never copy definitions into project discovery folders or create
 symlinks, junctions, hooks, watchers or update jobs.
+Do not create a `.codex` folder in consuming projects. Marketplace registration
+does not itself register Codex custom agents; that is separate host setup.
 
 Claude agents live in `agents/`, Codex role configurations in `codex-agents/`,
 shared role data in `team.json` and `roles/`, and shared procedures in `skills/`.
