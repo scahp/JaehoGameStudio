@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Create per-project JaehoGameStudio context files without replacing existing files."""
 import argparse
-import json
 import os
 from pathlib import Path
 import stat
@@ -47,21 +46,6 @@ def checked_destination(project, relative, directory=False):
         if not needs_directory and not stat.S_ISREG(info.st_mode):
             raise ValueError("destination is not a regular file: " + relative.as_posix())
     return info
-
-
-def uses_studio_references(project):
-    """Identify the existing native registration without a separate state file."""
-    marketplace = Path(".agents/plugins/marketplace.json")
-    if checked_destination(project, marketplace) is not None:
-        catalog = json.loads((project / marketplace).read_text(encoding="utf-8"))
-        if any(entry.get("name") == "jaeho-game-studio" for entry in catalog.get("plugins", [])):
-            return True
-    relative = Path(".codex/config.toml")
-    if checked_destination(project, relative) is None:
-        return False
-    lines = (project / relative).read_text(encoding="utf-8").splitlines()
-    return ("# BEGIN JAEHOGAMESTUDIO REFERENCES" in lines
-            and "# END JAEHOGAMESTUDIO REFERENCES" in lines)
 
 
 def _same_file(path, identity):

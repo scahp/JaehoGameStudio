@@ -2,7 +2,6 @@
 """Register a submodule by relative paths, without copying definitions or creating links."""
 import argparse
 import json
-import os
 from pathlib import Path
 import runpy
 import sys
@@ -79,11 +78,13 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
             if overlap:
                 raise ValueError("competing project role definitions; preserve and remove them first: " + ", ".join(sorted(overlap)))
 
-    codex_old = host.read(".codex/config.toml") or b""
-    codex_base = without_block(codex_old, BEGIN, END)
-    parsed = mirror["tomllib"].loads(codex_base.decode("utf-8"))
-    if set(parsed.get("agents", {})) & set(agents):
-        raise ValueError("existing Codex role registration conflicts; configuration preserved")
+    codex_old = host.read(".codex/config.toml")
+    if codex_old is not None:
+        codex_base = without_block(codex_old, BEGIN, END)
+        if codex_base != codex_old:
+            # Remove our former registration, preserving unrelated host config.
+            remaining = mirror["tomllib"].loads(codex_base.decode("utf-8"))
+            plan(".codex/config.toml", codex_base if remaining else None)
     # Keep existing marketplace metadata and unrelated entries.
     marketplace_raw = host.read(".agents/plugins/marketplace.json")
     marketplace = json.loads(marketplace_raw) if marketplace_raw else {"name": "project-tools", "plugins": []}
@@ -96,17 +97,6 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
     if not matches:
         entries.append(target)
         plan(".agents/plugins/marketplace.json", mirror["encoded"](marketplace))
-    # Plugin installation/activation belongs to the marketplace and the host's
-    # normal install action. This file only registers custom agent paths.
-    block = [BEGIN]
-    for name, value in sorted(agents.items()):
-        role_path = Path(os.path.relpath(source / "codex-agents" / (name + ".toml"), project / ".codex")).as_posix()
-        block += ["[agents." + name + "]", "description = " + mirror["quoted"](value["description"]),
-                  "config_file = " + mirror["quoted"](role_path), ""]
-    block += [END, ""]
-    codex_new = codex_base.rstrip(b"\r\n") + (b"\n\n" if codex_base else b"") + "\n".join(block).encode("utf-8")
-    if codex_old.replace(b"\r\n", b"\n") != codex_new.replace(b"\r\n", b"\n"):
-        plan(".codex/config.toml", codex_new)
     settings_raw = host.read(".claude/settings.json")
     settings = json.loads(settings_raw) if settings_raw else {}
     source_entry = {"source": {"source": "directory", "path": "./" + relative.as_posix()}}
@@ -134,13 +124,13 @@ def connect(source, project, mirror, helpers, check=False, quiet=False):
         return int(bool(plans))
     mirror["publish"](plans, helpers)
     # Empty former containers are harmless; remove them only when empty.
-    for directory in (".claude/skills/jgs-sync", ".agents/skills/jgs-sync", ".claude/skills", ".agents/skills", ".claude/agents", ".codex/agents"):
+    for directory in (".claude/skills/jgs-sync", ".agents/skills/jgs-sync", ".claude/skills", ".agents/skills", ".claude/agents", ".codex/agents", ".codex"):
         try:
             host.directory(directory)
             (project / directory).rmdir()
         except (OSError, ValueError):
             pass
-    print("registered relative paths: " + str(len(agents)) + " agents; no definition copies or filesystem links")
+    print("registered plugin paths; package contains " + str(len(agents)) + " agent definitions; no project .codex or definition copies created")
     return 0
 
 

@@ -3,9 +3,8 @@
 This repository is the complete shared plugin. Consuming projects register its
 relative path. Never copy definitions into project discovery folders or create
 symlinks, junctions, hooks, watchers or update jobs.
-Register Codex agents through relative `config_file` paths in the consuming
-project `.codex/config.toml`. Keep definitions inside this package; plugin
-discovery is registered separately in `.agents/plugins/marketplace.json`.
+Do not create a `.codex` folder in consuming projects. Marketplace registration
+does not itself register Codex custom agents; that is separate host setup.
 
 Claude agents live in `agents/`, Codex role configurations in `codex-agents/`,
 shared role data in `team.json` and `roles/`, and shared procedures in `skills/`.
@@ -24,8 +23,7 @@ When working from an engine, find the source through the `jaeho-game-studio`
 entry in `.agents/plugins/marketplace.json` and its `source.path`. Do not create
 a separate state file in the consuming project root. Adding `--project <engine>` also checks or updates its path
 registrations. Ordinary role-body and skill edits stay inside the submodule.
-Never edit a client's installed plugin cache. The explicit `--legacy-copies`
-option exists only for old clients and regression coverage, not new projects.
+Never edit a client's installed plugin cache.
 
 Resolve conflicting edits without overwriting either side. Preserve unrelated
 settings, agents and project records. Actual decisions, contracts and role

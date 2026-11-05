@@ -23,15 +23,6 @@ except ImportError:
 STATE = Path(".jgs-mirror.json")
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 IGNORED = {".git", "__pycache__", ".DS_Store"}
-ATTRIBUTES = (
-    "# BEGIN JAEHOGAMESTUDIO MIRRORS\n"
-    "/.claude/agents/jgs-*.md text eol=lf\n"
-    "/.codex/agents/jgs-*.toml text eol=lf\n"
-    "/.claude/skills/** text=auto eol=lf\n"
-    "/.agents/skills/** text=auto eol=lf\n"
-    "/.jgs-mirror.json text eol=lf\n"
-    "# END JAEHOGAMESTUDIO MIRRORS\n"
-).encode("ascii")
 
 
 class SkillFile:
@@ -68,7 +59,6 @@ class Tree:
         self.helpers = helpers
         self.reads = {}
         self.modes = {}
-        self.retired_skills = set()
 
     def read(self, relative):
         relative = Path(relative)
@@ -215,17 +205,16 @@ def read_skills(tree, relative):
         info = path.lstat()
         if stat.S_ISREG(info.st_mode):
             continue
-        # Reject aliases before traversal; the copied layout also works on Windows.
+        # Reject aliases before traversing shared skill resources.
         tree.directory(path.relative_to(tree.root))
         name = valid_name(path.name)
         entry = path.relative_to(tree.root) / "SKILL.md"
         data = tree.read(entry)
-        if data is None and name not in tree.retired_skills:
+        if data is None:
             raise ValueError("skill directory has no SKILL.md: " + str(entry))
-        if name not in tree.retired_skills:
-            fields, _ = frontmatter(data, str(entry))
-            if fields["name"] != name:
-                raise ValueError("skill directory and name differ: " + str(entry))
+        fields, _ = frontmatter(data, str(entry))
+        if fields["name"] != name:
+            raise ValueError("skill directory and name differ: " + str(entry))
 
         def walk(directory):
             for child in tree.children(directory):
@@ -261,26 +250,6 @@ def load_state(tree):
     return value
 
 
-def load_retirements(tree):
-    raw = tree.read("retired-skills.json")
-    if raw is None:
-        return {}
-    policy = json.loads(raw)
-    if not isinstance(policy, dict) or policy.get("schema") != 1 or not isinstance(policy.get("skills"), dict):
-        raise ValueError("invalid retired-skills.json")
-    for name, files in policy["skills"].items():
-        valid_name(name)
-        if not isinstance(files, dict) or not files:
-            raise ValueError("retired skill must record its published files: " + name)
-        for relative, expected in files.items():
-            path = Path(relative)
-            if path.is_absolute() or path.drive or not path.parts or ".." in path.parts:
-                raise ValueError("invalid retired skill path: " + relative)
-            if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
-                raise ValueError("invalid retired skill hash: " + relative)
-    return policy["skills"]
-
-
 def choose(label, candidates, baseline):
     values = {digest(value): value for value in candidates if value is not None}
     if not values:
@@ -291,45 +260,10 @@ def choose(label, candidates, baseline):
     return next(iter((changed or values).values()))
 
 
-def choose_mirror(label, source_values, host_values, source_hash, host_hash):
-    # Resolve uncommitted edits against each tree's own baseline first. A host
-    # can still be at A after the package was published at B; an intentional
-    # package edit back to A must not be mistaken for an unchanged host copy.
-    source_values = [value for value in source_values if value is not None]
-    host_values = [value for value in host_values if value is not None]
-    source = choose(label, source_values, source_hash) if source_values else None
-    host = choose(label, host_values, host_hash) if host_values else None
-    if source is None and host is None:
-        raise ValueError("all copies are missing; restore or explicitly retire " + label)
-    if source is None:
-        return host
-    if host is None or digest(source) == digest(host):
-        return source
-    source_changed = (digest(source) != host_hash
-                      or (source_hash is not None and digest(source) != source_hash))
-    host_changed = digest(host) != host_hash
-    if source_changed and host_changed:
-        raise ValueError("mirror conflict: " + label + "; different edits found, all files preserved")
-    return source if source_changed else host
-
-
-def synchronize(source, project, helpers, check=False):
-    if project is not None and helpers["uses_studio_references"](project):
-        raise ValueError("project uses path references; copied synchronization is disabled")
+def synchronize(source, helpers, check=False):
+    """Mirror native formats inside the package; never distribute project copies."""
     package = Tree(source, helpers)
-    host = None if project is None else Tree(project, helpers)
-    if project is not None and (project == source or project.is_relative_to(source)):
-        raise ValueError("project must be outside the plugin package")
-    source_state = load_state(package)
-    host_state = load_state(host) if host else None
-    retired = load_retirements(package)
-    package.retired_skills = set(retired)
-    if host:
-        host.retired_skills = set(retired)
-    if host_state and (project / host_state["package"]).resolve() != source:
-        raise ValueError("project mirror state points to a different package")
-    source_base = source_state or {"agents": {}, "skills": {}}
-    host_base = host_state or {"agents": {}, "skills": {}}
+    baseline = load_state(package) or {"agents": {}, "skills": {}}
     raw_team = package.read("team.json")
     team = json.loads(raw_team) if raw_team is not None else None
     if not isinstance(team, dict) or not team:
@@ -343,122 +277,55 @@ def synchronize(source, project, helpers, check=False):
         body = package.text(Path("roles") / (role + ".md"))
         if body is not None:
             canonical[name] = profile(name, entry.get("purpose"), body)
-    agent_groups = [canonical, read_agents(package, Path("agents"), True),
-                    read_agents(package, Path("codex-agents"), False)]
-    if host:
-        agent_groups += [read_agents(host, Path(".claude/agents"), True),
-                         read_agents(host, Path(".codex/agents"), False)]
-    skill_groups = [read_skills(package, Path("skills"))]
-    if host:
-        skill_groups += [read_skills(host, Path(".claude/skills")),
-                         read_skills(host, Path(".agents/skills"))]
-    agents = {name: choose_mirror("agent " + name,
-                                 [group.get(name) for group in agent_groups[:3]],
-                                 [group.get(name) for group in agent_groups[3:]],
-                                 source_base["agents"].get(name), host_base["agents"].get(name))
-              for name in sorted(set(source_base["agents"]).union(host_base["agents"],
-                                 *(set(g) for g in agent_groups)))}
-    skills = {name: choose_mirror("skill " + name,
-                                 [group.get(name) for group in skill_groups[:1]],
-                                 [group.get(name) for group in skill_groups[1:]],
-                                 source_base["skills"].get(name), host_base["skills"].get(name))
-              for name in sorted(set(source_base["skills"]).union(host_base["skills"],
-                                 *(set(g) for g in skill_groups)))
-              if Path(name).parts and Path(name).parts[0] not in retired}
-    # State paths are data, never paths to write without validation.
+    groups = [canonical, read_agents(package, Path("agents"), True),
+              read_agents(package, Path("codex-agents"), False)]
+    agents = {name: choose("agent " + name, [group.get(name) for group in groups],
+                           baseline["agents"].get(name))
+              for name in sorted(set(baseline["agents"]).union(*(set(group) for group in groups)))}
+    current_skills = read_skills(package, Path("skills"))
+    skills = {name: choose("skill " + name, [current_skills.get(name)], baseline["skills"].get(name))
+              for name in sorted(set(baseline["skills"]).union(current_skills))}
     for name in skills:
         relative = Path(name)
-        if len(relative.parts) < 2 or relative.is_absolute() or ".." in relative.parts:
+        if len(relative.parts) < 2 or relative.is_absolute() or relative.drive or ".." in relative.parts:
             raise ValueError("invalid skill state path: " + name)
         valid_name(relative.parts[0])
         if relative.parts[0] in agents:
             raise ValueError("developer role must be an agent, not a duplicate skill: " + relative.parts[0])
     plans = {}
 
-    def plan(tree, relative, data, executable=None):
-        key = (tree.root, Path(relative))
-        old = tree.read(relative)
-        if old != tree.reads[Path(relative)]:
+    def plan(relative, data):
+        relative = Path(relative)
+        old = package.read(relative)
+        if old != package.reads[relative]:
             raise ValueError("file changed during sync; all files preserved: " + str(relative))
-        mode = ((tree.root / relative).stat().st_mode & 0o777) if old is not None else 0o644
-        desired_mode = mode if executable is None or os.name == "nt" else (0o755 if executable else 0o644)
-        if old != data or mode != desired_mode:
-            plans[key] = (tree, old, data, mode, desired_mode)
-
-    retirement_trees = [(package, Path("skills"), skill_groups[0])]
-    if host:
-        retirement_trees += [(host, Path(".claude/skills"), skill_groups[1]),
-                             (host, Path(".agents/skills"), skill_groups[2])]
-    for tree, directory, files in retirement_trees:
-        for name, value in files.items():
-            parts = Path(name).parts
-            if parts[0] in retired:
-                expected = retired[parts[0]].get(Path(*parts[1:]).as_posix())
-                if digest(value) != expected:
-                    raise ValueError("retired role skill has local edits or unknown files; migrate them to its agent first: " + name)
-                plan(tree, directory / name, None)
+        mode = package.modes[relative] if old is not None else 0o644
+        if old != data:
+            plans[(source, relative)] = (package, old, data, mode, mode)
 
     updated_team = json.loads(raw_team)
     for name, value in agents.items():
         role = name[4:]
         entry = updated_team.setdefault(role, {"agent": name, "title": name, "tasks": []})
         entry["purpose"] = value["description"]
-        plan(package, Path("roles") / (role + ".md"), value["instructions"].encode("utf-8"))
-        plan(package, Path("agents") / (name + ".md"), render_profile(value, True))
-        plan(package, Path("codex-agents") / (name + ".toml"), render_profile(value, False, config_layer=True))
-        if host:
-            plan(host, Path(".claude/agents") / (name + ".md"), render_profile(value, True))
-            plan(host, Path(".codex/agents") / (name + ".toml"), render_profile(value, False))
+        plan(Path("roles") / (role + ".md"), value["instructions"].encode("utf-8"))
+        plan(Path("agents") / (name + ".md"), render_profile(value, True))
+        plan(Path("codex-agents") / (name + ".toml"), render_profile(value, False, config_layer=True))
     if updated_team != team:
-        plan(package, Path("team.json"), encoded(updated_team))
-    for name, value in skills.items():
-        plan(package, Path("skills") / name, value.data, value.executable)
-        if host:
-            plan(host, Path(".claude/skills") / name, value.data, value.executable)
-            plan(host, Path(".agents/skills") / name, value.data, value.executable)
-    state = {"schema": 1, "package": ".", "agents": {key: digest(value) for key, value in agents.items()},
-             "skills": {key: digest(value) for key, value in skills.items()}}
-    plan(package, STATE, encoded(state))
-    if host:
-        host_record = dict(state, package=Path(os.path.relpath(source, project)).as_posix())
-        plan(host, STATE, encoded(host_record))
-        # Parent repositories can enforce CRLF even when the submodule uses LF.
-        # Merge only the scoped mirror rules; preserve every existing byte.
-        existing = host.read(".gitattributes") or b""
-        normalized = existing.replace(b"\r\n", b"\n")
-        if ATTRIBUTES not in normalized:
-            if b"# BEGIN JAEHOGAMESTUDIO MIRRORS" in existing or b"# END JAEHOGAMESTUDIO MIRRORS" in existing:
-                raise ValueError("existing studio .gitattributes block differs; all files preserved")
-            separator = b"\n" if existing.endswith(b"\n") else b"\n\n" if existing else b""
-            plan(host, Path(".gitattributes"), existing + separator + ATTRIBUTES)
+        plan("team.json", encoded(updated_team))
+    plan(STATE, encoded({"schema": 1, "package": ".",
+                         "agents": {name: digest(value) for name, value in agents.items()},
+                         "skills": {name: digest(value) for name, value in skills.items()}}))
     package.ensure_unchanged()
-    if host:
-        host.ensure_unchanged()
     if check:
+        for _, relative in plans:
+            print("out-of-sync package/" + relative.as_posix())
         if plans:
-            for (root, relative) in plans:
-                print("out-of-sync " + ("package/" if root == source else "project/") + relative.as_posix())
             return 1
-        print("up-to-date: " + str(len(agents)) + " agents, " + str(len(skills)) + " skill files")
-        return 0
-    publish(plans, helpers)
-    # Files were explicitly retired by policy and verified before publication.
-    # Remove empty containers only; never recursively remove user data/caches.
-    for tree, directory, _ in retirement_trees:
-        for name, files in retired.items():
-            root = directory / name
-            directories = {root}
-            for published in files:
-                directories.update(root / parent for parent in Path(published).parents)
-            for relative in sorted(directories, key=lambda value: len(value.parts), reverse=True):
-                try:
-                    if tree.directory(relative) is not None:
-                        (tree.root / relative).rmdir()
-                except (OSError, ValueError):
-                    pass
-    for (root, relative), change in plans.items():
-        print(("retired " if change[2] is None else "mirrored ")
-              + ("package/" if root == source else "project/") + relative.as_posix())
+    else:
+        publish(plans, helpers)
+        for _, relative in plans:
+            print("mirrored package/" + relative.as_posix())
     print("up-to-date: " + str(len(agents)) + " agents, " + str(len(skills)) + " skill files")
     return 0
 
@@ -519,7 +386,6 @@ def replace_file(tree, relative, expected, data, mode):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, help="register package paths in this engine project")
-    parser.add_argument("--legacy-copies", action="store_true", help="explicit compatibility mode for older copied projects")
     parser.add_argument("--check", action="store_true", help="report drift without changing any files")
     args = parser.parse_args(argv)
     if tomllib is None:
@@ -535,14 +401,14 @@ def main(argv=None):
                     & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
                 raise ValueError("project is a symlink or junction; select its real directory")
         project = None if args.project is None else helpers["resolve_project"](args.project)
-        if project is not None and not args.legacy_copies:
+        if project is not None:
             connector = runpy.run_path(str(Path(__file__).with_name("connect-project.py")))
             # Validate migration before changing even the package's own mirrors.
             connector["connect"](source, project, globals(), helpers, check=True, quiet=True)
-            package_result = synchronize(source, None, helpers, args.check)
+            package_result = synchronize(source, helpers, args.check)
             project_result = connector["connect"](source, project, globals(), helpers, check=args.check)
             return max(package_result, project_result)
-        return synchronize(source, project, helpers, args.check)
+        return synchronize(source, helpers, args.check)
     except (OSError, ValueError, TypeError, KeyError) as error:
         # Relative component names keep ordinary success output safe for Windows
         # consoles; errors use backslash escapes if a path cannot be encoded.
